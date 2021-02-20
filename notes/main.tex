@@ -1,0 +1,107 @@
+
+\documentclass[11pt,reqno,twoside]{article}
+\usepackage{ dsfont }
+\usepackage{float}
+\input{macro} 
+
+\title{Clase 10:               % UPDATE LECTURE NUMBER
+    Boosting}	% UPDATE TITLE
+
+\author{%
+  Responsable:& Mariana Pérez-Cong Sánchez % >>>>> SCRIBE NAME(S)
+}
+
+\begin{document}
+\maketitle 
+
+\section{Introducción}
+\label{sec:introduction}
+\begin{itemize}
+    \item Quisieramos ver una generalizacion sobre los predictores lineales
+    \item  Que sean capaces de atacar el compromiso de sesgo y varianza.
+    \begin{itemize}
+        \item Mayor complejidad $\Rightarrow$ error de aproximación pequeño
+        
+    \end{itemize}
+    \item Boosting nos permite controlar este compromiso por medio de un parámetro. Empieza con un modelo sencillo pero gana complejidad en el proceso de aprendizaje.
+    \item Vamos a ver \textbf{Ada Boost} (Adaptative Boosting): combina predicciones de manera lineal.
+    
+\end{itemize}
+
+
+\section{Capacidad de aprendizaje Débil}
+Tenemos:
+\begin{itemize}
+    \item PAC con $m_H(\epsilon, \delta)$
+    \item Teorema fundamental de Aprendizaje Estadístico $\rightarrow$ ERM
+    \item ¿Existe un algoritmo eficiente con un error ligeramente mejor que lanzar una moneda?
+\end{itemize}
+\\
+\textbf{Definición:}\\
+Un algoritmo A es $\gamma-débil$ para H si $\exists m_H:(0,1)\rightarrow \N$ tal que $\forall \delta \in (0,1)$, D y $f: X \rightarrow \{ \pm 1\}$ y si se mantiene la hipótesis de realizabiladidad,entonces con $m> m_H(\delta)$ iid de D, el algoritmo regresa un candidato $h \in H$ tal que con probabilidad mayor o igual a $1-\delta$, $L_D(h)\leq \frac{1}{2}-\gamma$
+\begin{itemize}
+    \item Decimos que H es $\gamma- débil$ si existe un algoritmo $\gamma-débil$ para dicha clase
+\end{itemize}
+\\
+\textbf{Ejemplo:} Sea $X=\R$ y H los clasificadores en tres partes:
+\[H= \{ h_{\theta_1, \theta_2,b}: \theta_1, \theta_2 \in \R, \theta_1 < \theta_2 , b \in \{ \pm 1\}\}\]
+\[h_{\theta_1, \theta_2,b}(x)= \begin{cases}-b \qquad \text{si }  x<\theta \text{ o } x>\theta_2\\-b \qquad \text{si } x\in [\theta_1, \theta_2]\end{cases} \]
+Sea $B=\{f:f(x)=signo(x-\theta) \cdot b : \theta \in \R, b \in \{\pm 1\}\}$. Veremos que $ERM_b$ es $\gamma-debil$ para H con $\gamma=1/2$. $\exists h \in B$ que tendrá un error de clasificacion $Ld(h)<\frac{1}{3}$\\
+$VCdim(B)=2 \Rightarrow m_H(\gamma) \geq \frac{log(1/\gamma)}{\epsilon}$ (módulo una constante).
+
+Entonces, Con prob $ \geq 1-\delta$, ERM tiene un error de generalizacion $\leq 1/3 + \epsilon. $\\ Si consideramos $\epsilon =1/12$ $\Rightarrow 1/3+1/12=1/2-1/12$\\
+$\therefore ERM_b$  es $\gamma-debil$
+
+\subsection{Implementacion}
+Sea $X= \R^d$; $H_{DS}=\{g:g(x)=signo(\theta-x_i), x \in \R ^d, \theta \in \R, i=\{1,..., d\}\}$
+Sea $S=\{(x_i, y_i)\}_{i=1}^{m}$.\\ Vamos a ver cómo minimizar $L_s(h)$y cómo se pueden usar estos predictores débiles para Ada Boost.
+
+Sea $\D$ un vector de probabilidades en $\R^m$ ($D_i \geq 0, \sum \D_i=1$). El modelo recibe $\D, S$ y regresa un predictor $h:X \rightarrow\{\pm 1\}$, donde h minimiza el riesgo con respecto a $\D$
+\[L_{\D}(h)=\sum_{i=1}^{m} \D i \mathds{1}_{[h(x^{(i)}) \neq y^{(i)} ]}\]
+$\forall h\in H_{DS}$ es $h=h(\theta,i)$ Entonces queremos minimizar:
+\[\min_j \min_{\theta} \left( \sum_{i:y^{(i)}=1} \D_i \ \mathds{1}_{[x_j^{(i)}>\theta]}  + \sum_{i: y^{(i)}=-1} \D_i \ \mathds{1}_{[x_j^{(i)}<\theta]}\right)\]
+Si consideramos fija j, podemos ordenar:
+\[x_j^{(1)} \leq ... \leq x_j^{(m)}\]
+\[\Theta_j = \left \{ \frac{x_j^{(i)}+x_j^{(i+1)}}{2}: i \in {1,..,m-1} \right \} \cup \left \{ x_j^{(1)}-1 , x_j^{(m)}+1 \right\}\]
+Como $\forall \theta \in \R \quad \exists \theta ' \in \Theta_j$ que realiza las mismas predicciones, en lugar de optimizar $\R$, optimimizamos $\Theta_j$
+
+\section{Ada Boost}
+$S={(x^{(i)}, y^{(i)})}_{i=1}^{m}$ donde $y^{(i)}=f(x^{(i)})$.\\
+Al tiempo t:
+\begin{enumerate}
+    \item Definimos una distribución sobre S $\D^{(t)} \in \R^{m}_+$
+    \item Utilizamos un algoritmo débil con $S, \D^{(t)}$. Obtenemos $h_t$ con error
+    \[\epsilon := L_{D^{(t)}} (h_t) \leq 1/2 -\gamma\]
+    Con prob $\geq 1- \delta$
+    \item Asignamos una contribución a $h_t$ con $w_t= \frac{1}{2} log (1/\epsilon_t -1)$
+    \item Calculamos una nueva distribución:
+    \[\Tilde{\D}_i ^{(t+1)}= \D^{(t)}_i exp \left(-w_ty^{(i)}h_t(x^{(i)})\right)\]
+    \[\D_i^{(t+1)}= \frac{\Tilde{\D_i}^{(t+1)}}{\sum_j \Tilde{\D_j }^{(t+1)}}\]
+\end{enumerate}
+Repetimos los pasos 1)-4) T veces de forma que:
+\[h_s(x)= signo\left( \sum_{t=1}^T w_t h_t(x)\right) \]
+\\
+\textbf{Teorema:} Sea S un conjunto de entrenamiento y asumamos que en cada iteración de AdaBoost tenemos $\epsilon_t \leq 1/2-\gamma$, entonces el error de entrenamiento:
+\[L_s(hs)= \frac{1}{m} \sum_{i=1}^m \mathds{1}_{[h_s(x^{(i)})\neq y^{(i)}]} \leq exp^{(-2\gamma^2T)}\]
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{Adaboost.jpeg}
+    \caption{Modelos lineales vs. Combinación lineal}
+    \label{fig:my_label}
+\end{figure}
+\begin{itemize}
+    \item Los modelos débiles pueden fallar con probabilidad $\delta$. La probabilidad de éxito al tiempo T está acotada por $1-\delta T$
+    \item ¿Como podemos garantizar que el error de estimación ($Ls(h_s) - \min_{h\in H} L_{\D}(h))$ es pequeño?\\
+    $VCdim(H)\rightarrow pequeña \rightarrow$ garantiza buen desempeño
+    \item $L(B,T)= \{h(x)= signo \left( \sum_{t=1}^T w_t h-t(x) \right) : x\in \R^d, wt \in \R^T, h_t \in R \}$
+    \\
+    $VCdim(L(B,T)) \leq T VCdim(B)$
+    \\ Por lo tanto T nos ayuda a controlar el compromiso entre sesgo y varianza
+\end{itemize}
+
+\bibliographystyle{siam} % <<< USE "alpha" BIBLIOGRAPHY STYLE
+\bibliography{template} % <<< RENAME TO "lecture_XX"
+
+
+\end{document}
